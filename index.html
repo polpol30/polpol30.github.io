@@ -368,7 +368,7 @@ dialog.hub-plus .auth-tabs{display:flex;gap:10px;margin-bottom:20px}dialog.hub-p
             <button onclick="scrollToSec('stories')" class="block w-full text-right px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-300 hover:bg-white/5">قصص النجاح</button>
             <button onclick="scrollToSec('arts')" class="block w-full text-right px-3.5 py-2.5 rounded-xl text-xs font-bold text-gray-300 hover:bg-white/5">ركن الفنون والمسرح</button>
         </div>
-    </header><div class="hub-shortcuts"><a href="#teams"><i class="fa-solid fa-people-group"></i> فرق المشاريع</a><button data-action="profile"><i class="fa-regular fa-user"></i> حسابي</button><button data-action="saved-resources"><i class="fa-regular fa-bookmark"></i> مفضلتي</button><button data-action="dashboard"><i class="fa-solid fa-sliders"></i> إدارة بياناتي</button><span>الإضافات محفوظة على هذا الجهاز</span></div>
+    </header><div class="hub-shortcuts"><a href="#teams"><i class="fa-solid fa-people-group"></i> فرق المشاريع</a><button data-action="profile"><i class="fa-regular fa-user"></i> حسابي</button><button data-action="saved-resources"><i class="fa-regular fa-bookmark"></i> مفضلتي</button><button data-action="dashboard"><i class="fa-solid fa-sliders"></i> إدارة مشاركاتي</button><span><span id="shared-status" role="status">جاري التحقق من الاتصال…</span><button data-action="refresh-shared">تحديث البيانات</button></span></div>
 
     <!-- MAIN PAGE CONTAINER -->
     <main class="flex-grow z-10">
@@ -501,7 +501,7 @@ dialog.hub-plus .auth-tabs{display:flex;gap:10px;margin-bottom:20px}dialog.hub-p
                                 <i class="fa-solid fa-pen-to-square"></i>
                                 <span>احجز مقعدك الآن مجاناً</span>
                             </button>
-                            <p id="workshop-capacity" class="text-[11px] text-gray-400 font-medium"></p><p class="text-[10px] text-gray-500">تسجيل تجريبي محلي؛ لا يؤكد مقعدًا لدى جهة منظمة.</p>
+                            <p id="workshop-capacity" class="text-[11px] text-gray-400 font-medium"></p><p class="text-[10px] text-gray-500">تسجيل اهتمام محفوظ على الحساب؛ لا يؤكد مقعدًا لدى جهة منظمة.</p>
                         </div>
 
                     </div>
@@ -686,7 +686,7 @@ const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const me = () => authUser && authReady ? state.profiles.find(p => p.id === authUser.id) : undefined;
-const nameOf = id => state.profiles.find(p => p.id === id)?.name || 'ملف غير متاح';
+const nameOf = id => state.profiles.find(p => p.id === id)?.name || state.authorNames?.[id] || 'طالب';
 const normal = s => String(s || '').trim().toLocaleLowerCase('ar').normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآ]/g,'ا').replace(/ى/g,'ي');
 const includes = (s,q) => normal(s).includes(normal(q));
 const tags = list => list.map(t => `<span>${esc(t)}</span>`).join('');
@@ -695,13 +695,6 @@ const safeUrl = text => { try { const url = new URL(text); return ['https:','htt
 let savedOnly = false;
 let toastTimer;
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('visible'),4200); }
-function commit(change) {
-  if (!authReady || !authUser) { authDialog('login'); return false; }
-  if (storageIssue) { toast('تعذر قراءة التخزين. نزّل البيانات القديمة أو استخدم متصفحًا يسمح بالتخزين قبل الإضافة.'); return false; }
-  const previous = JSON.stringify(state);
-  try { change(); localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); render(); return true; }
-  catch { state = JSON.parse(previous); toast('تعذر حفظ التغيير. تحقق من مساحة المتصفح وإتاحة التخزين المحلي.'); return false; }
-}
 function empty(title,description,button='') { return `<div class="empty"><strong>${esc(title)}</strong>${esc(description)}${button ? `<div>${button}</div>`:''}</div>`; }
 function button(action,label,id='',style='text-button') { return `<button class="${style}" data-action="${action}" data-id="${esc(id)}">${esc(label)}</button>`; }
 function openDialog(title,body,submit) {
@@ -735,13 +728,13 @@ function profileDialog() { if (authUser && authReady) accountDialog(); else auth
 function teamDialog(id='') {
   if (!requireProfile()) return;
   const t=state.teams.find(t=>t.id===id); if(t && t.owner!==me().id) return;
-  openDialog(t?'تعديل الفريق':'فريق جديد',`<form>${field('اسم المشروع أو الفريق','title',t?.title||'',{max:100})}${selectField('المجال','category',['برمجة وتقنية','تصميم وتجربة مستخدم','بحث أكاديمي','فنون وإعلام','مجال آخر'],t?.category)}${textarea('وصف الفكرة والهدف والنتيجة المتوقعة','description',t?.description||'')}${field('المهارات المطلوبة — افصل بفاصلة','skills',t?.skills.join('، ')||'',{max:300})}<div class="form-row">${field('عدد أعضاء الفريق شامل صاحب الفريق','capacity',t?.capacity||4,{type:'number',max:3})}${selectField('حالة المشروع','status',['مفتوح','مكتمل','مغلق'],t?.status)}</div><p class="form-note">طلبات الانضمام تظهر لصاحب الفريق عند اختيار ملفه على هذا المتصفح.</p>${formEnd(t?'حفظ الفريق':'نشر الفريق')}`,(data,form)=>{
+  openDialog(t?'تعديل الفريق':'فريق جديد',`<form>${field('اسم المشروع أو الفريق','title',t?.title||'',{max:100})}${selectField('المجال','category',['برمجة وتقنية','تصميم وتجربة مستخدم','بحث أكاديمي','فنون وإعلام','مجال آخر'],t?.category)}${textarea('وصف الفكرة والهدف والنتيجة المتوقعة','description',t?.description||'')}${field('المهارات المطلوبة — افصل بفاصلة','skills',t?.skills.join('، ')||'',{max:300})}<div class="form-row">${field('عدد أعضاء الفريق شامل صاحب الفريق','capacity',t?.capacity||4,{type:'number',max:3})}${selectField('حالة المشروع','status',['مفتوح','مكتمل','مغلق'],t?.status)}</div><p class="form-note">فريقك متاح للأعضاء. طلبات الانضمام تظهر لصاحب الفريق وصاحب الطلب فقط.</p>${formEnd(t?'حفظ الفريق':'نشر الفريق')}`,async(data,form)=>{
     if(!validateText(form,data,['title','description','skills'])) return;
     const capacity=Number(data.get('capacity')), skills=skillsOf(data.get('skills'));
     if(!Number.isInteger(capacity)||capacity<2||capacity>30||capacity<(t?.members.length||1)) { form.querySelector('.error').textContent='عدد الأعضاء من 2 إلى 30، ولا يقل عن الأعضاء الحاليين.'; return; }
     if(!skills.length) { form.querySelector('.error').textContent='حدد مهارة مطلوبة واحدة على الأقل.'; return; }
     const next={id:t?.id||uid(),owner:me().id,title:data.get('title').trim(),description:data.get('description').trim(),category:data.get('category'),skills,capacity,status:data.get('status'),members:t?.members||[me().id]};
-    if(commit(()=>{if(t) state.teams[state.teams.findIndex(x=>x.id===id)]=next; else state.teams.unshift(next);})){ closeDialog();toast('اتحفظ الفريق.'); }
+    await cloudCommand('save_team',next);closeDialog();toast('اتحفظ الفريق وبقى ظاهر للأعضاء.');
   });
   const cap=$('modal-body').querySelector('[name="capacity"]'); if(cap){cap.min=2;cap.max=30;cap.step=1;}
 }
@@ -758,9 +751,9 @@ function renderTeams() {
 function applyDialog(id) {
   if(!requireProfile())return;
   const t=state.teams.find(x=>x.id===id); if(!t||t.owner===me().id||t.status!=='مفتوح'||t.members.length>=t.capacity||state.requests.some(r=>r.team===id&&r.user===me().id))return;
-  openDialog('طلب انضمام للفريق',`<p class="form-note">${esc(t.title)} · الطلب هيتسجل محليًا ويظهر لصاحب الفريق في إدارة الطلبات.</p><form>${textarea('عرف الفريق بنفسك وإزاي تقدر تساعد','message','',700)}${formEnd('إرسال الطلب المحلي')}`,(data,form)=>{
+  openDialog('طلب انضمام للفريق',`<p class="form-note">${esc(t.title)} · الطلب محفوظ على الخادم، ويظهر لصاحب الفريق في إدارة الطلبات.</p><form>${textarea('عرف الفريق بنفسك وإزاي تقدر تساعد','message','',700)}${formEnd('إرسال طلب الانضمام')}`,async(data,form)=>{
     if(!validateText(form,data,['message']))return;
-    if(commit(()=>state.requests.push({id:uid(),team:id,user:me().id,message:data.get('message').trim(),status:'pending'}))){closeDialog();toast('اتسجل طلبك، في انتظار مراجعة صاحب الفريق على الجهاز.');}
+    await cloudCommand('apply',{team:id,message:data.get('message').trim()});closeDialog();toast('اترسل طلبك لصاحب الفريق.');
   });
 }
 function manageTeam(id) {
@@ -768,21 +761,21 @@ function manageTeam(id) {
   const requests=state.requests.filter(r=>r.team===id);
   openDialog('إدارة الفريق',`<p class="form-note">${esc(t.title)} · ${t.members.length} من ${t.capacity} أعضاء<br>الأعضاء: ${t.members.map(x=>esc(nameOf(x))).join('، ')}</p><h3>طلبات الانضمام</h3>${requests.length?requests.map(r=>`<div class="management-row"><strong>${esc(nameOf(r.user))}</strong><p>${esc(r.message)}</p><div class="actions">${r.status==='pending'?button('accept-request','قبول',r.id,'primary')+button('reject-request','رفض',r.id,'secondary'):`<span class="badge">${r.status==='accepted'?'مقبول':'مرفوض'}</span>`}</div></div>`).join(''):'<p class="muted">مفيش طلبات لسه.</p>'}<div class="form-actions">${button('edit-team','تعديل الفريق',id,'secondary')}${button('delete-team','حذف الفريق',id,'danger')}</div>`);
 }
-function decideRequest(id,accept) {
+async function decideRequest(id,accept) {
   const r=state.requests.find(x=>x.id===id),t=state.teams.find(x=>x.id===r?.team);
   if(!r||!t||t.owner!==me()?.id||r.status!=='pending')return;
   if(accept&&(t.status!=='مفتوح'||t.members.length>=t.capacity)){toast('الفريق مغلق أو اكتمل العدد. عدّل بياناته أولًا.');return;}
-  if(commit(()=>{r.status=accept?'accepted':'rejected';if(accept&&!t.members.includes(r.user))t.members.push(r.user);})){manageTeam(t.id);toast(accept?'اتقبل العضو في الفريق.':'اتحدثت حالة الطلب.');}
+  await cloudCommand('decide_request',{id,accept});manageTeam(t.id);toast(accept?'اتقبل العضو في الفريق.':'اتحدثت حالة الطلب.');
 }
 
 function resourceDialog(id='') {
   if(!requireProfile())return;
   const r=state.resources.find(x=>x.id===id);if(r&&r.owner!==me().id)return;
-  openDialog(r?'تعديل المرجع':'شارك مرجع يفيد دفعتك',`<p class="form-note">أضف رابطًا متاحًا للقراءة ومن حقك مشاركته. النشر يتطلب مراجعة من لوحة إدارة النسخة المحلية.</p><form>${field('عنوان المرجع','title',r?.title||'',{max:140})}<div class="form-row">${field('الكلية أو المعهد','college',r?.college||me().college,{max:80})}${field('المادة','subject',r?.subject||'',{max:100})}</div><div class="form-row">${selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],r?.year||me().year)}${selectField('الترم','term',['الأول','الثاني'],r?.term)}</div>${selectField('نوع المرجع','type',['ملخص','امتحان سابق','مشروع تخرج','مرجع'],r?.type)}${field('رابط الملف أو المعاينة','url',r?.url||'',{type:'url',max:2000,placeholder:'https://drive.google.com/…'})}${textarea('وصف المحتوى','description',r?.description||'',700)}${formEnd('حفظ وإرسال للمراجعة المحلية')}`,(data,form)=>{
+  openDialog(r?'تعديل المرجع':'شارك مرجع يفيد دفعتك',`<p class="form-note">أضف رابطًا متاحًا للقراءة ومن حقك مشاركته. المرجع الجديد يظهر للأعضاء، وتقدر تخفيه من إدارة مشاركاتك.</p><form>${field('عنوان المرجع','title',r?.title||'',{max:140})}<div class="form-row">${field('الكلية أو المعهد','college',r?.college||me().college,{max:80})}${field('المادة','subject',r?.subject||'',{max:100})}</div><div class="form-row">${selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],r?.year||me().year)}${selectField('الترم','term',['الأول','الثاني'],r?.term)}</div>${selectField('نوع المرجع','type',['ملخص','امتحان سابق','مشروع تخرج','مرجع'],r?.type)}${field('رابط الملف أو المعاينة','url',r?.url||'',{type:'url',max:2000,placeholder:'https://drive.google.com/…'})}${textarea('وصف المحتوى','description',r?.description||'',700)}${formEnd('حفظ المرجع ومشاركته')}`,async(data,form)=>{
     if(!validateText(form,data,['title','college','subject','description']))return;
     const url=safeUrl(data.get('url'));if(!url){form.querySelector('.error').textContent='أضف رابط http أو https صالحًا، بدون اسم مستخدم أو كلمة مرور.';return;}
-    const next={id:r?.id||uid(),owner:me().id,title:data.get('title').trim(),college:data.get('college').trim(),subject:data.get('subject').trim(),year:data.get('year'),term:data.get('term'),type:data.get('type'),url,description:data.get('description').trim(),status:'pending',opens:r?.opens||0};
-    if(commit(()=>{if(r)state.resources[state.resources.findIndex(x=>x.id===id)]=next;else state.resources.unshift(next);})){closeDialog();toast('اتحفظ المرجع. تقدر تراجعه وتنشره من إدارة النسخة.');}
+    const next={id:r?.id||uid(),owner:me().id,title:data.get('title').trim(),college:data.get('college').trim(),subject:data.get('subject').trim(),year:data.get('year'),term:data.get('term'),type:data.get('type'),url,description:data.get('description').trim(),status:r?.status||'published',opens:r?.opens||0};
+    await cloudCommand('save_resource',next);closeDialog();toast('اتحفظ المرجع على الخادم وبقى متاح للأعضاء.');
   });
 }
 function visibleResources() {
@@ -793,19 +786,19 @@ function renderResources() {
   const list=visibleResources(),p=me();
   $('resource-count').textContent=`${list.length} مرجع في العرض الحالي`;
   $('all-resources').classList.toggle('selected',!savedOnly);$('saved-resources').classList.toggle('selected',savedOnly);$('all-resources').setAttribute('aria-pressed',String(!savedOnly));$('saved-resources').setAttribute('aria-pressed',String(savedOnly));
-  $('resource-grid').innerHTML=list.length?list.map(r=>`<article class="card"><div class="card-header"><span class="pill">${esc(r.type)}</span>${button('favorite',p?.favorites.includes(r.id)?'♥ محفوظ':'♡ حفظ',r.id)}</div><h3>${esc(r.title)}</h3><p>${esc(r.description)}</p><div class="meta">${esc(r.college)} · الفرقة ${esc(r.year)} · الترم ${esc(r.term)}<br>${esc(r.subject)} · بواسطة ${esc(nameOf(r.owner))}</div>${r.status!=='published'?`<p class="badge pending">${r.status==='pending'?'قيد المراجعة المحلية':'مخفي بواسطة الإدارة'}</p>`:''}<div class="card-bottom">${button('preview','معاينة المرجع',r.id,'primary')}<span class="muted">${r.opens} فتح للرابط</span>${r.owner===p?.id?button('edit-resource','تعديل',r.id):''}</div></article>`).join(''):empty(savedOnly?'مفضلتك لسه فاضية':'مفيش مراجع مطابقة',savedOnly?'احفظ المراجع المهمة من زر «حفظ».':'أضف أول مرجع أو غيّر عوامل البحث.',savedOnly?'':button('new-resource','+ شارك مرجع'));
+  $('resource-grid').innerHTML=list.length?list.map(r=>`<article class="card"><div class="card-header"><span class="pill">${esc(r.type)}</span>${button('favorite',p?.favorites.includes(r.id)?'♥ محفوظ':'♡ حفظ',r.id)}</div><h3>${esc(r.title)}</h3><p>${esc(r.description)}</p><div class="meta">${esc(r.college)} · الفرقة ${esc(r.year)} · الترم ${esc(r.term)}<br>${esc(r.subject)} · بواسطة ${esc(nameOf(r.owner))}</div>${r.status!=='published'?`<p class="badge pending">${r.status==='pending'?'قيد المراجعة':'مخفي بواسطة الإدارة'}</p>`:''}<div class="card-bottom">${button('preview','معاينة المرجع',r.id,'primary')}<span class="muted">${r.opens} فتح للرابط</span>${r.owner===p?.id?button('edit-resource','تعديل',r.id):''}</div></article>`).join(''):empty(savedOnly?'مفضلتك لسه فاضية':'مفيش مراجع مطابقة',savedOnly?'احفظ المراجع المهمة من زر «حفظ».':'أضف أول مرجع أو غيّر عوامل البحث.',savedOnly?'':button('new-resource','+ شارك مرجع'));
 }
 function previewResource(id) {
   const r=state.resources.find(x=>x.id===id);if(!r||(r.status!=='published'&&r.owner!==me()?.id))return;
   const url=safeUrl(r.url);
   openDialog('معاينة المرجع',`<span class="pill">${esc(r.type)}</span><h3>${esc(r.title)}</h3><p class="muted">${esc(r.description)}</p><p class="meta">${esc(r.subject)} · ${esc(r.college)} · ${esc(nameOf(r.owner))}</p>${url?`<a class="preview-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer" data-track="${esc(id)}">فتح الملف في تبويب جديد ↗<br><span dir="ltr">${esc(new URL(url).hostname)}</span></a><p class="muted">المعاينة متاحة عبر موقع الملف؛ تأكد إن صاحبه أتاح صلاحية القراءة.</p>`:'<p class="error">رابط المرجع غير صالح.</p>'}<div class="form-actions">${button('favorite',me()?.favorites.includes(id)?'إزالة من المفضلة':'حفظ في المفضلة',id,'secondary')}${button('report','الإبلاغ عن المرجع',id,'secondary')}${r.owner===me()?.id?button('delete-resource','حذف المرجع',id,'danger'):''}</div>`);
 }
-function favorite(id) {if(!requireProfile())return;if(!state.resources.some(r=>r.id===id&&(r.status==='published'||r.owner===me().id)))return;const p=me(),exists=p.favorites.includes(id);if(commit(()=>p.favorites=exists?p.favorites.filter(x=>x!==id):[...p.favorites,id])){toast(exists?'اتشال المرجع من المفضلة.':'اتحفظ في مفضلتك.');if($('modal').open)previewResource(id);}}
+async function favorite(id) {if(!requireProfile())return;const p=me(),exists=p.favorites.includes(id);await cloudCommand('favorite',{id,saved:!exists});toast(exists?'اتشال المرجع من المفضلة.':'اتحفظ في مفضلتك على حسابك.');if($('modal').open)previewResource(id);}
 function reportDialog(id) {
   if(!requireProfile())return;
   if(state.reports.some(r=>r.resource===id&&r.user===me().id&&r.status==='open')){toast('عندك بلاغ مفتوح بالفعل للمرجع ده.');return;}
   const resource=state.resources.find(r=>r.id===id&&(r.status==='published'||r.owner===me().id));if(!resource)return;
-  openDialog('الإبلاغ عن مرجع',`<form>${selectField('سبب البلاغ','reason',['الرابط لا يعمل','محتوى غير مناسب','حقوق مشاركة المحتوى','سبب آخر'])}${textarea('تفاصيل تساعد في المراجعة','details','',500)}${formEnd('تسجيل البلاغ محليًا')}`,(data,form)=>{if(!validateText(form,data,['details']))return;if(commit(()=>state.reports.unshift({id:uid(),resource:id,user:me().id,reason:data.get('reason'),details:data.get('details').trim(),status:'open'}))){closeDialog();toast('اتسجل البلاغ في لوحة إدارة النسخة.');}});
+  openDialog('الإبلاغ عن مرجع',`<form>${selectField('سبب البلاغ','reason',['الرابط لا يعمل','محتوى غير مناسب','حقوق مشاركة المحتوى','سبب آخر'])}${textarea('تفاصيل تساعد في المراجعة','details','',500)}${formEnd('إرسال البلاغ')}`,async(data,form)=>{if(!validateText(form,data,['details']))return;await cloudCommand('report',{resource:id,reason:data.get('reason'),details:data.get('details').trim()});closeDialog();toast('اتسجل البلاغ لصاحب المرجع.');});
 }
 function renderStudents() {
   const list=state.profiles.filter(p=>includes([p.name,p.college,p.bio,...p.skills].join(' '),$('student-search').value)&&(!$('available-only').checked||p.available));
@@ -817,21 +810,18 @@ function render() {
   $('stats').innerHTML=counts.map(([n,label])=>`<div class="stat"><strong>${n.toLocaleString('ar-EG')}</strong><span>${label}</span></div>`).join('');
   renderTeams();renderResources();renderStudents();
   const workshopBookings=state.bookings.filter(b=>(b.event||'ورشة UI/UX')==='ورشة UI/UX');
-  $('workshop-capacity').textContent=`${workshopBookings.length} تسجيل محلي · ${Math.max(0,60-workshopBookings.length)} مكان متاح في النسخة التجريبية`;
+  $('workshop-capacity').textContent=`${state.bookingCounts?.['ورشة UI/UX']||0} تسجيل اهتمام · ${Math.max(0,60-(state.bookingCounts?.['ورشة UI/UX']||0))} مكان متاح`;
   $('booking-button').textContent=workshopBookings.some(b=>b.user===me()?.id)?'إلغاء تسجيل اهتمامي':'سجل اهتمامك';
 }
 function book(eventName='ورشة UI/UX') {
   if(!requireProfile())return;
   const existing=state.bookings.find(b=>b.user===me().id&&(b.event||'ورشة UI/UX')===eventName);
-  if(existing){confirmDialog('إلغاء التسجيل','تحب تلغي تسجيل اهتمامك بالورشة؟',()=>{if(commit(()=>state.bookings=state.bookings.filter(b=>b.id!==existing.id))){closeDialog();toast('اتلغى تسجيل الاهتمام.');}});return;}
-  if(state.bookings.filter(b=>(b.event||'ورشة UI/UX')===eventName).length>=60){toast('اكتمل العدد في هذه النسخة المحلية.');return;}
-  openDialog('تسجيل اهتمام: '+eventName,`<p class="form-note">التسجيل ده محلي للتجربة فقط، ولا يرسل بياناتك إلى منظم أو يؤكد مقعدًا فعليًا.</p><form>${field('اسمك للتسجيل','name',me().name,{max:80})}${field('رقم للتواصل معك','phone','',{type:'tel',max:24})}<label class="check"><input type="checkbox" required> فاهم إن التسجيل محفوظ على هذا الجهاز فقط</label>${formEnd('حفظ تسجيل الاهتمام')}`,(data,form)=>{if(!validateText(form,data,['name','phone']))return;const phone=data.get('phone').trim();if(!/^[+\d\s()\-٠-٩]{7,24}$/.test(phone)){form.querySelector('.error').textContent='اكتب رقم تواصل صالحًا من 7 إلى 24 حرفًا.';return;}if(commit(()=>state.bookings.push({id:uid(),user:me().id,event:eventName,name:data.get('name').trim(),phone,date:new Date().toISOString()}))){closeDialog();toast('اتسجل اهتمامك محليًا. ده مش تأكيد حجز فعلي.');}});
+  if(existing){confirmDialog('إلغاء التسجيل','تحب تلغي تسجيل اهتمامك بالورشة؟',async()=>{await cloudCommand('cancel_booking',{id:existing.id});closeDialog();toast('اتلغى تسجيل الاهتمام.');});return;}
+  if((state.bookingCounts?.[eventName]||0)>=60){toast('اكتمل عدد التسجيلات لهذه الفعالية.');return;}
+  openDialog('تسجيل اهتمام: '+eventName,`<p class="form-note">التسجيل محفوظ على حسابك ويمكنك رؤيته من أي جهاز. بيانات التواصل خاصة بك؛ لا يؤكد مقعدًا فعليًا عند منظم الورشة.</p><form>${field('اسمك للتسجيل','name',me().name,{max:80})}${field('رقم للتواصل معك','phone','',{type:'tel',max:24})}<label class="check"><input type="checkbox" required> فاهم إن تسجيل الاهتمام لا يؤكد مقعدًا فعليًا</label>${formEnd('حفظ تسجيل الاهتمام')}`,async(data,form)=>{if(!validateText(form,data,['name','phone']))return;const phone=data.get('phone').trim();if(!/^[+\d\s()\-٠-٩]{7,24}$/.test(phone)){form.querySelector('.error').textContent='اكتب رقم تواصل صالحًا من 7 إلى 24 حرفًا.';return;}await cloudCommand('book',{event:eventName,name:data.get('name').trim(),phone});closeDialog();toast('اتحفظ تسجيل اهتمامك على حسابك. ده مش تأكيد من جهة منظمة.');});
 }
 function confirmDialog(title,message,action) {openDialog(title,`<p class="form-note">${esc(message)}</p><form>${formEnd('تأكيد')}`,action);}
-function dashboard() {
-  const pending=state.resources.filter(r=>r.status==='pending'),reports=state.reports.filter(r=>r.status==='open');
-  openDialog('إدارة بياناتي المحلية',`<p class="form-note">اللوحة دي لإدارة أنشطتك المحلية في هذا المتصفح. ليست لوحة مشرف على حسابات المستخدمين.</p><h3>مراجع تنتظر المراجعة (${pending.length})</h3>${pending.length?pending.map(r=>`<div class="management-row"><strong>${esc(r.title)}</strong><p>${esc(nameOf(r.owner))} · ${esc(r.subject)}</p>${safeUrl(r.url)?`<a class="text-button" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">افتح الرابط للمراجعة ↗</a>`:''}<div class="actions">${button('publish','نشر المرجع',r.id,'primary')}${button('hide-resource','إخفاء',r.id,'secondary')}</div></div>`).join(''):'<p class="muted">كل المراجع اتراجعت.</p>'}<h3>البلاغات المفتوحة (${reports.length})</h3>${reports.length?reports.map(r=>`<div class="management-row"><strong>${esc(state.resources.find(x=>x.id===r.resource)?.title||'مرجع محذوف')} — ${esc(r.reason)}</strong><p>${esc(r.details)}</p><div class="actions">${button('hide-resource','إخفاء المرجع',r.resource,'secondary')}${button('resolve-report','إنهاء البلاغ',r.id,'primary')}</div></div>`).join(''):'<p class="muted">مفيش بلاغات مفتوحة.</p>'}<h3>تسجيلات الاهتمام بالورشة (${state.bookings.length})</h3>${state.bookings.length?state.bookings.map(b=>`<div class="management-row"><strong>${esc(b.name)}</strong><p>${esc(b.event||'ورشة UI/UX')}</p><p><bdi>${esc(b.phone)}</bdi> · ${new Date(b.date).toLocaleDateString('ar-EG',{timeZone:'Africa/Cairo'})}</p>${button('delete-booking','حذف التسجيل',b.id,'danger')}</div>`).join(''):'<p class="muted">مفيش تسجيلات لسه.</p>'}<h3>المراجع المخفية</h3>${state.resources.filter(r=>r.status==='hidden').map(r=>`<div class="management-row"><strong>${esc(r.title)}</strong><div>${button('publish','إعادة النشر',r.id)}</div></div>`).join('')||'<p class="muted">لا توجد مراجع مخفية.</p>'}<div class="form-actions">${button('export','تنزيل نسخة احتياطية','','secondary')}</div><p class="muted">النسخة الاحتياطية تتضمن الملفات وروابط التواصل وأرقام تسجيلات الورش. احتفظ بها في مكان خاص.</p>`);
-}
+function dashboard() { sharedDashboard(); }
 function exportData() {
   const content=storageIssue?localStorage.getItem(STORAGE_KEY):JSON.stringify(state,null,2);
   const blob=new Blob([content||'{}'],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='unihub-backup-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('بدأ تنزيل نسخة البيانات.');
@@ -841,27 +831,27 @@ const actions={
   'switch-profile':()=>authDialog('login'),
   'new-team':()=>teamDialog(),'edit-team':teamDialog,'manage-team':manageTeam,apply:applyDialog,
   'accept-request':id=>decideRequest(id,true),'reject-request':id=>decideRequest(id,false),
-  'cancel-request':id=>{const r=state.requests.find(r=>r.id===id);if(r?.user===me()?.id&&r.status==='pending')commit(()=>state.requests=state.requests.filter(x=>x.id!==id));},
-  'delete-team':id=>{const t=state.teams.find(t=>t.id===id);if(!t||t.owner!==me()?.id)return;confirmDialog('حذف الفريق','سيتم حذف الفريق وطلبات انضمامه من هذا الجهاز.',()=>{if(commit(()=>{state.teams=state.teams.filter(t=>t.id!==id);state.requests=state.requests.filter(r=>r.team!==id);})){closeDialog();toast('اتحذف الفريق.');}});},
+  'cancel-request':async id=>{await cloudCommand('cancel_request',{id});toast('اتسحب الطلب.');},
+  'delete-team':id=>{const t=state.teams.find(t=>t.id===id);if(!t||t.owner!==me()?.id)return;confirmDialog('حذف الفريق','سيتم حذف فريقك وطلبات انضمامه من الموقع.',async()=>{await cloudCommand('delete_team',{id});closeDialog();toast('اتحذف الفريق.');});},
   'new-resource':()=>resourceDialog(),'edit-resource':resourceDialog,preview:previewResource,favorite,report:reportDialog,
-  'delete-resource':id=>{const r=state.resources.find(r=>r.id===id);if(!r||r.owner!==me()?.id)return;confirmDialog('حذف المرجع','سيتم حذف المرجع من المكتبة والمفضلة والبلاغات المرتبطة به.',()=>{if(commit(()=>{state.resources=state.resources.filter(r=>r.id!==id);state.profiles.forEach(p=>p.favorites=p.favorites.filter(x=>x!==id));state.reports=state.reports.filter(r=>r.resource!==id);})){closeDialog();toast('اتحذف المرجع.');}});},
+  'delete-resource':id=>{const r=state.resources.find(r=>r.id===id);if(!r||r.owner!==me()?.id)return;confirmDialog('حذف المرجع','سيتم حذف المرجع من المكتبة والمفضلة والبلاغات المرتبطة به.',async()=>{await cloudCommand('delete_resource',{id});closeDialog();toast('اتحذف المرجع.');});},
   'all-resources':()=>{savedOnly=false;renderResources();},'saved-resources':()=>{if(requireProfile()){savedOnly=true;renderResources();}},
   book,dashboard,export:exportData,
-  publish:id=>{const r=state.resources.find(r=>r.id===id);if(r&&safeUrl(r.url)&&commit(()=>r.status='published')){dashboard();toast('اتنشر المرجع في المكتبة المحلية.');}},
-  'hide-resource':id=>{const r=state.resources.find(r=>r.id===id);if(r&&commit(()=>r.status='hidden')){dashboard();toast('اتخفى المرجع.');}},
-  'resolve-report':id=>{const r=state.reports.find(r=>r.id===id);if(r&&commit(()=>r.status='resolved'))dashboard();},
-  'delete-booking':id=>confirmDialog('حذف التسجيل','سيتم حذف تسجيل الاهتمام من هذا الجهاز.',()=>{if(commit(()=>state.bookings=state.bookings.filter(b=>b.id!==id)))dashboard();})
+  publish:async id=>{await cloudCommand('resource_visibility',{id,published:true});dashboard();toast('اتنشر المرجع للأعضاء.');},
+  'hide-resource':async id=>{await cloudCommand('resource_visibility',{id,published:false});dashboard();toast('اتخفى المرجع عن الأعضاء.');},
+  'resolve-report':async id=>{await cloudCommand('resolve_report',{id});dashboard();},
+  'delete-booking':id=>confirmDialog('إلغاء التسجيل','سيتم إلغاء هذا التسجيل من حسابك.',async()=>{await cloudCommand('cancel_booking',{id});dashboard();})
 };
 document.addEventListener('click',async e=>{
   const target=e.target.closest('[data-action]');
   if(target){e.preventDefault();try{await actions[target.dataset.action]?.(target.dataset.id||'');}catch(error){toast(typeof authError==='function'?authError(error):'تعذر إتمام العملية. حاول مرة أخرى.');}}
-  const track=e.target.closest('[data-track]');if(track){const r=state.resources.find(r=>r.id===track.dataset.track);if(r)commit(()=>r.opens++);}
+  const track=e.target.closest('[data-track]');if(track){const r=state.resources.find(r=>r.id===track.dataset.track);if(r&&authUser)cloudCommand('open_resource',{id:r.id}).catch(()=>{});}
 });
 ['team-search','team-status'].forEach(id=>$(id).addEventListener('input',renderTeams));
 ['resource-search','filter-college','filter-year','filter-term','filter-type'].forEach(id=>$(id).addEventListener('input',renderResources));
 ['student-search','available-only'].forEach(id=>$(id).addEventListener('input',renderStudents));
 $('modal').addEventListener('click',e=>{if(e.target===$('modal')){const r=$('modal').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}});
-window.addEventListener('storage',event=>{if(event.key===STORAGE_KEY){closeDialog();toast('البيانات اتغيرت في تبويب آخر. حدّث الصفحة قبل الاستمرار.');storageIssue=true;}});
+
 render();
 if(storageIssue)toast('تعذر قراءة بياناتك المحفوظة. لم يتم حذفها؛ نزّل نسخة احتياطية من أسفل الصفحة.');
 </script><script>// Compatibility hooks for the original UniHub page and its navigation.
@@ -885,7 +875,7 @@ function updateWorkshopCountdown(){
 }
 updateWorkshopCountdown();setInterval(updateWorkshopCountdown,1000);
 // Keep the original page counters while showing only the local data counts.
-const statsLabels=['ملف طالب ظاهر لك','فريق ومشروع محلي','مرجع أكاديمي منشور','تسجيل اهتمام محلي'];
+const statsLabels=['ملف طالب ظاهر لك','فريق ومشروع مشترك','مرجع أكاديمي منشور','تسجيلاتي بالورش'];
 function labelOriginalStats(){document.querySelectorAll('#stats .stat span').forEach((el,i)=>el.textContent=statsLabels[i]);}
 const originalRender=render;
 render=function(){originalRender();labelOriginalStats();};
@@ -993,13 +983,7 @@ function authDialog(mode='login'){
   });
 }
 function authMessage(title,text){openDialog(title,`<div class="auth-success"><i class="fa-regular fa-envelope" aria-hidden="true"></i><p>${esc(text)}</p></div><div class="auth-links">${button('auth-login','تسجيل الدخول','','primary')}${button('auth-resend','إعادة إرسال التأكيد')}</div>`);}
-function loadUserActivity(userId){
-  STORAGE_KEY='unihub.activity.v4.'+userId;storageIssue=false;
-  let cached=null;
-  try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){cached=JSON.parse(raw);if(cached.version!==3||!['profiles','teams','resources','requests','bookings','reports'].every(k=>Array.isArray(cached[k])))throw Error('invalid_cache');}}
-  catch{cached=null;storageIssue=true;toast('تعذر قراءة الأنشطة المحلية. بيانات حسابك على الخادم لم تتأثر.');}
-  state=cached||blankState();state.active=userId;
-}
+function loadUserActivity(userId){ state=blankState();state.active=userId;storageIssue=false;STORAGE_KEY='unihub.activity.v4.'+userId; }
 function currentFavorites(id){return state.profiles.find(p=>p.id===id)?.favorites?.filter(x=>typeof x==='string')||[];}
 function mergeCloudProfiles(rows,own){
   const favorites=currentFavorites(own.id);
@@ -1028,22 +1012,23 @@ function acceptAuthSession(session,force=false){
     if(epoch!==authEpoch)throw Error('stale_session');
     if(authUser?.id!==data.user.id)loadUserActivity(data.user.id);
     authUser=data.user;authReady=true;authStarting=false;mergeCloudProfiles(profiles.rows,profiles.own);render();updateAuthControls();
+    await sharedRefresh(true).catch(()=>{});startSharedSync();
   })().catch(error=>{if(epoch===authEpoch){authUser=null;authReady=false;authStarting=false;state=blankState();authUserProfile=null;render();updateAuthControls();}throw error;}).finally(()=>{if(authLoad?.promise===promise)authLoad=null;});
   authLoad={id:session.user.id,promise};return promise;
 }
-function clearAuthState(){authEpoch++;authLoad=null;authUser=null;authReady=false;authStarting=false;authUserProfile=null;state=blankState();savedOnly=false;STORAGE_KEY='unihub.activity.guest.v4';storageIssue=false;render();updateAuthControls();}
+function clearAuthState(){stopSharedSync();authEpoch++;authLoad=null;authUser=null;authReady=false;authStarting=false;authUserProfile=null;state=blankState();savedOnly=false;STORAGE_KEY='unihub.activity.guest.v4';storageIssue=false;render();updateAuthControls();}
 function updateAuthControls(){
   const account=$('account-button');if(account)account.textContent=authStarting?'جاري التحقق…':authUser?(me()?.name.split(' ')[0]||'حسابي')+' · حسابي':'تسجيل الدخول';
   const shortcut=document.querySelector('.hub-shortcuts [data-action="profile"]');if(shortcut)shortcut.innerHTML='<i class="fa-regular fa-user" aria-hidden="true"></i> '+(authUser?'حسابي':'تسجيل الدخول');
 }
 function accountDialog(){
   if(!authUser||!authReady)return authDialog('login');
-  openDialog('حسابي',`<div class="auth-account"><span class="auth-symbol"><i class="fa-regular fa-user" aria-hidden="true"></i></span><h3>${esc(me()?.name||'حسابي')}</h3><p dir="ltr">${esc(authUser.email)}</p><span class="badge">البريد مؤكد</span></div><div class="auth-menu">${button('cloud-profile','تعديل الملف الشخصي','','secondary')}${button('auth-refresh','إعادة تحميل ملفي','','secondary')}${button('auth-password','تغيير كلمة المرور','','secondary')}${button('auth-logout','الخروج من هذا الجهاز','','secondary')}${button('auth-logout-all','الخروج من جميع الأجهزة','','danger')}</div><p class="muted">ملفك الشخصي محفوظ في حسابك على الخادم. أنشطة الفرق والمكتبة والورش في النسخة الحالية محفوظة داخل هذا المتصفح فقط.</p>`);
+  openDialog('حسابي',`<div class="auth-account"><span class="auth-symbol"><i class="fa-regular fa-user" aria-hidden="true"></i></span><h3>${esc(me()?.name||'حسابي')}</h3><p dir="ltr">${esc(authUser.email)}</p><span class="badge">البريد مؤكد</span></div><div class="auth-menu">${button('cloud-profile','تعديل الملف الشخصي','','secondary')}${button('auth-refresh','إعادة تحميل ملفي','','secondary')}${button('import-legacy','نقل مشاركاتي القديمة','','secondary')}${button('auth-password','تغيير كلمة المرور','','secondary')}${button('auth-logout','الخروج من هذا الجهاز','','secondary')}${button('auth-logout-all','الخروج من جميع الأجهزة','','danger')}</div><p class="muted">ملفك ومشاركاتك محفوظة على الخادم. الفرق والمراجع مشتركة بين الأعضاء، والمفضلة والتسجيلات خاصة بحسابك.</p>`);
 }
 function cloudProfileDialog(){
   if(!authUser||!authReady)return authDialog('login');
   const p=me();if(!p)return accountDialog();
-  openDialog('ملفي الشخصي',`<form>${field('الاسم','name',p.name,{max:70})}<div class="form-row">${field('الكلية أو المعهد','college',p.college,{max:80})}${selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],p.year)}</div>${field('المهارات — افصل بينها بفاصلة','skills',p.skills.join('، '),{max:300})}${textarea('نبذة عنك ومجالات اهتمامك','bio',p.bio,500)}${field('رابط تواصل اختياري','contact',p.contact,{type:'url',required:false,max:1000})}<label class="check"><input type="checkbox" name="available" ${p.available?'checked':''}> متاح للانضمام لفريق</label><label class="check"><input type="checkbox" name="visible" ${p.directory_visible?'checked':''}> أوافق على ظهور ملفي ورابط تواصلي للطلبة المسجلين</label><p class="muted">بريدك لا يظهر في دليل الطلبة. تقدر تخفي ملفك في أي وقت بإلغاء اختيار الظهور.</p>${formEnd('حفظ على حسابي')}`,async(data,form)=>{
+  openDialog('ملفي الشخصي',`<form>${field('الاسم','name',p.name,{max:70})}<div class="form-row">${field('الكلية أو المعهد','college',p.college,{max:80})}${selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],p.year)}</div>${field('المهارات — افصل بينها بفاصلة','skills',p.skills.join('، '),{max:300})}${textarea('نبذة عنك ومجالات اهتمامك','bio',p.bio,500)}${field('رابط تواصل اختياري','contact',p.contact,{type:'url',required:false,max:1000})}<label class="check"><input type="checkbox" name="available" ${p.available?'checked':''}> متاح للانضمام لفريق</label><label class="check"><input type="checkbox" name="visible" ${p.directory_visible?'checked':''}> أوافق على ظهور ملفي ورابط تواصلي للطلبة المسجلين</label><p class="muted">بريدك لا يظهر في دليل الطلبة. عند إلغاء الظهور يصبح الملف خاصًا ولن يراه الحساب الآخر في الدليل. اسمك يظل ظاهرًا على المشاركات التي تنشرها.</p>${formEnd('حفظ على حسابي')}`,async(data,form)=>{
     if(!validateText(form,data,['name','college','skills','bio']))return;
     const contact=String(data.get('contact')||'').trim(),skills=skillsOf(data.get('skills'));
     if(contact&&!safeUrl(contact)){form.querySelector('.error').textContent='أضف رابط http أو https صالحًا.';return;}
@@ -1051,7 +1036,7 @@ function cloudProfileDialog(){
     const userId=authUser.id,patch={name:data.get('name').trim(),college:data.get('college').trim(),year:data.get('year'),skills,bio:data.get('bio').trim(),contact:contact?safeUrl(contact):'',available:data.has('available'),directory_visible:data.has('visible')};
     const {data:updated,error}=await authClient.from('unihub_profiles').update(patch).eq('id',userId).select(AUTH_COLUMNS).single();
     if(error)throw error;if(authUser?.id!==userId)throw Error('stale_session');
-    state.profiles=state.profiles.filter(x=>x.id!==userId);state.profiles.unshift({...updated,favorites:p.favorites});authUserProfile=updated;render();closeDialog();toast('اتحفظ ملفك على حسابك.');
+    state.profiles=state.profiles.filter(x=>x.id!==userId);state.profiles.unshift({...updated,favorites:p.favorites});authUserProfile=updated;await sharedRefresh(true).catch(()=>{});render();closeDialog();toast(patch.directory_visible?'اتحفظ ملفك وهو ظاهر للطلبة.':'اتحفظ ملفك وهو خاص؛ فعّل الظهور لو عايز الطلبة يشوفوه.');
   });
 }
 function passwordDialog(recovery=false){
@@ -1115,6 +1100,92 @@ async function initializeAuth(){
   // INITIAL_SESSION is emitted by the official SDK after URL/session handling.
 }
 initializeAuth().catch(error=>{authStarting=false;updateAuthControls();toast(authError(error));});
+</script>
+<!-- UNIHUB_SHARED_MODULE -->
+<script>// Shared activity comes from authenticated RPCs, never from browser snapshots.
+let sharedReady=false, sharedBusy=false, sharedReadSeq=0, sharedTimer=null, sharedLastError='';
+function sharedError(error){
+  const messages={forbidden:'مش مسموح لك تعدّل بيانات حساب تاني.',unauthorized:'الجلسة غير متاحة. سجّل الدخول من جديد.',team_full:'الفريق مغلق أو عدد أعضائه اكتمل.',capacity_below_members:'العدد المطلوب أقل من أعضاء الفريق الحاليين.',event_full:'اكتمل عدد تسجيلات هذه الفعالية.',request_already_decided:'الطلب اتراجع بالفعل. حدّث القائمة.',invalid_input:'راجع البيانات المدخلة.',import_too_large:'استيراد أكثر من 200 عنصر يحتاج تقسيم البيانات.',shared_unavailable:'تعذر الوصول للمحتوى المشترك. جرّب تحديث البيانات.',stale_session:'الجلسة اتغيرت. سجّل الدخول من جديد.'};
+  if(messages[error?.message])return messages[error.message];
+  if(error?.code==='23505')return 'الطلب أو التسجيل ده موجود بالفعل.';
+  if(error?.code==='23514'||error?.code==='23502'||error?.code==='22P02')return 'بعض البيانات غير صالحة. راجع الحقول وحاول تاني.';
+  if(error?.code==='PGRST202'||error?.code==='42P01')return 'تحديث قاعدة البيانات لم يكتمل. تواصل مع صاحب الموقع.';
+  return authError(error);
+}
+function updateSharedStatus(){
+  const label=$('shared-status');if(!label)return;
+  label.textContent=!authUser?'سجّل الدخول لعرض المحتوى المشترك':sharedLastError?'تعذر التحديث — '+sharedLastError:sharedBusy?'جاري مزامنة البيانات…':sharedReady?'المحتوى متزامن بين الحسابات · تحديث تلقائي كل 8 ثوانٍ':'جاري تحميل المحتوى المشترك…';
+  label.dataset.failed=sharedLastError?'true':'false';
+}
+async function sharedRefresh(force=false){
+  if(!authUser||!authReady||!authClient)return false;
+  if(sharedBusy&&!force)return false;
+  const userId=authUser.id,seq=++sharedReadSeq;
+  sharedBusy=true;updateSharedStatus();
+  try{
+    const [{data,error},profiles]=await Promise.all([authClient.rpc('unihub_snapshot'),fetchProfiles(userId)]);
+    if(error)throw error;if(!data||!['teams','resources','requests','bookings','reports','favorites'].every(k=>Array.isArray(data[k])))throw Error('shared_unavailable');
+    if(seq!==sharedReadSeq||authUser?.id!==userId)return false;
+    state.teams=data.teams;state.resources=data.resources;state.requests=data.requests;state.bookings=data.bookings;state.reports=data.reports;state.bookingCounts=data.bookingCounts||{};
+    mergeCloudProfiles(profiles.rows,profiles.own);me().favorites=data.favorites;
+    const names={};for(const t of data.teams){names[t.owner]=t.ownerName;Object.assign(names,t.memberNames||{});}for(const r of data.resources)names[r.owner]=r.ownerName;for(const r of data.requests)names[r.user]=r.userName;
+    state.authorNames=names;sharedReady=true;sharedLastError='';render();return true;
+  }catch(error){if(seq===sharedReadSeq&&authUser?.id===userId)sharedLastError=sharedError(error);throw error;}
+  finally{if(seq===sharedReadSeq){sharedBusy=false;updateSharedStatus();}}
+}
+async function cloudCommand(action,payload){
+  if(!authUser||!authReady)throw Error('unauthorized');
+  const userId=authUser.id;
+  const {data,error}=await authClient.rpc('unihub_mutate',{action_name:action,payload});
+  if(error){const failure=Error(sharedError(error));failure.sharedMessage=true;throw failure;}
+  if(authUser?.id!==userId)throw Error('stale_session');
+  // An acknowledged write must not be reported as lost if the follow-up read fails.
+  await sharedRefresh(true).catch(()=>{});
+  return data;
+}
+function startSharedSync(){
+  if(sharedTimer)clearInterval(sharedTimer);
+  sharedTimer=setInterval(()=>{if(document.visibilityState==='visible'&&authUser&&!sharedBusy)sharedRefresh().catch(()=>{});},8000);
+  updateSharedStatus();
+}
+function stopSharedSync(){
+  if(sharedTimer)clearInterval(sharedTimer);sharedTimer=null;sharedReadSeq++;sharedBusy=false;sharedReady=false;sharedLastError='';updateSharedStatus();
+}
+function legacyActivity(){
+  if(!authUser)return null;
+  try{
+    const value=JSON.parse(localStorage.getItem('unihub.activity.v4.'+authUser.id)||'null');if(!value)return null;
+    const mine=(key,owner)=>Array.isArray(value[key])?value[key].filter(x=>x&&x[owner]===authUser.id):[];
+    const oldProfile=Array.isArray(value.profiles)?value.profiles.find(p=>p.id===authUser.id):null;
+    const data={teams:mine('teams','owner'),resources:mine('resources','owner'),bookings:mine('bookings','user'),favorites:Array.isArray(oldProfile?.favorites)?oldProfile.favorites.filter(x=>typeof x==='string'):[]};
+    return data.teams.length+data.resources.length+data.bookings.length+data.favorites.length?data:null;
+  }catch{return null;}
+}
+function importLegacyDialog(){
+  if(!requireProfile())return;const data=legacyActivity();
+  if(!data){toast('مفيش فرق أو مراجع أو تسجيلات محلية تخص حسابك في المتصفح ده.');return;}
+  openDialog('نقل مشاركاتي القديمة',`<p class="form-note">عندك ${data.teams.length} فريق، و${data.resources.length} مرجع، و${data.bookings.length} تسجيل، و${data.favorites.length} مفضلة محفوظين في هذا المتصفح. نقل الفرق والمراجع ينشرها للأعضاء المسجلين. بيانات التسجيل والمفضلة تظل خاصة بحسابك.</p><p class="muted">سيتم نقل مشاركاتك فقط. عضوية الآخرين وقرارات الطلبات القديمة لا تُستورد كحقائق موثقة. العناصر الموجودة على الخادم لن تُستبدل، والنسخة المحلية لن تُحذف.</p><form>${formEnd('نقل مشاركاتي إلى الخادم')}`,async()=>{
+    const result=await cloudCommand('import_owned',data);closeDialog();toast(`اتنقل ${result.imported||0} عنصر جديد. العناصر الموجودة بالفعل لم تتكرر.`);
+  });
+}
+function sharedDashboard(){
+  if(!requireProfile())return;
+  const mine=state.resources.filter(r=>r.owner===me().id),reports=state.reports.filter(f=>mine.some(r=>r.id===f.resource));
+  openDialog('إدارة مشاركاتي',`<p class="form-note">الفرق والمراجع متاحة للأعضاء. طلبات الانضمام يراها صاحب الطلب وصاحب الفريق فقط؛ تسجيلات الورش وأرقام التواصل خاصة بصاحب الحساب.</p><h3>مراجعي (${mine.length})</h3>${mine.length?mine.map(r=>`<div class="management-row"><strong>${esc(r.title)}</strong><p>${r.status==='published'?'منشور للأعضاء':'مخفي عن الأعضاء'}</p><div class="actions">${button('edit-resource','تعديل',r.id,'secondary')}${button(r.status==='published'?'hide-resource':'publish',r.status==='published'?'إخفاء':'نشر',r.id,'secondary')}${button('delete-resource','حذف',r.id,'danger')}</div></div>`).join(''):'<p class="muted">لم تضف مراجع بعد.</p>'}<h3>بلاغات تخص مراجعي</h3>${reports.length?reports.map(f=>`<div class="management-row"><strong>${esc(f.reason)}</strong><p>${esc(f.details)}</p>${f.status==='open'?button('resolve-report','إنهاء البلاغ',f.id,'secondary'):'<span class="badge">تمت المراجعة</span>'}</div>`).join(''):'<p class="muted">مفيش بلاغات.</p>'}<h3>تسجيلاتي في الورش (${state.bookings.length})</h3>${state.bookings.map(b=>`<div class="management-row"><strong>${esc(b.event)}</strong><p>${esc(b.name)} · <bdi>${esc(b.phone)}</bdi></p>${button('delete-booking','إلغاء التسجيل',b.id,'danger')}</div>`).join('')||'<p class="muted">مفيش تسجيلات.</p>'}<div class="form-actions">${button('import-legacy','نقل مشاركاتي القديمة','','secondary')}${button('export','تنزيل نسخة من بياناتي','','secondary')}${button('refresh-shared','تحديث البيانات','','secondary')}</div>`);
+}
+Object.assign(actions,{
+  dashboard:sharedDashboard,
+  'refresh-shared':async()=>{if(!requireProfile())return;await sharedRefresh(true);toast('اتحدثت البيانات من الخادم.');},
+  'import-legacy':importLegacyDialog
+});
+dashboard=sharedDashboard;
+const sharedBaseAuthError=authError;
+authError=function(error){return error?.sharedMessage?error.message:sharedBaseAuthError(error);};
+const sharedRenderBase=render;
+render=function(){sharedRenderBase();updateSharedStatus();};
+window.addEventListener('focus',()=>{if(authUser)sharedRefresh().catch(()=>{});});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&authUser)sharedRefresh().catch(()=>{});});
+updateSharedStatus();
 </script>
 <!-- UNIHUB_ADS_MODULE -->
 <script>// UniHub ads: direct sponsors and manually placed AdSense units.
