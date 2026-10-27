@@ -763,12 +763,13 @@ function profileDialog() { if (authUser && authReady) accountDialog(); else auth
 function teamDialog(id='') {
   if (!requireProfile()) return;
   const t=state.teams.find(t=>t.id===id); if(t && t.owner!==me().id) return;
-  openDialog(t?'تعديل الفريق':'فريق جديد',`<form>${field('اسم المشروع أو الفريق','title',t?.title||'',{max:100})}${selectField('المجال','category',['برمجة وتقنية','تصميم وتجربة مستخدم','بحث أكاديمي','فنون وإعلام','مجال آخر'],t?.category)}${textarea('وصف الفكرة والهدف والنتيجة المتوقعة','description',t?.description||'')}${field('المهارات المطلوبة — افصل بفاصلة','skills',t?.skills.join('، ')||'',{max:300})}<div class="form-row">${field('عدد أعضاء الفريق شامل صاحب الفريق','capacity',t?.capacity||4,{type:'number',max:3})}${selectField('حالة المشروع','status',['مفتوح','مكتمل','مغلق'],t?.status)}</div><p class="form-note">فريقك متاح للأعضاء. طلبات الانضمام تظهر لصاحب الفريق وصاحب الطلب فقط.</p>${formEnd(t?'حفظ الفريق':'نشر الفريق')}`,async(data,form)=>{
+  openDialog(t?'تعديل الفريق':'فريق جديد',`<form>${field('اسم المشروع أو الفريق','title',t?.title||'',{max:100})}${selectField('المجال','category',['برمجة وتقنية','تصميم وتجربة مستخدم','بحث أكاديمي','فنون وإعلام','مجال آخر'],t?.category)}${textarea('وصف الفكرة والهدف والنتيجة المتوقعة','description',t?.description||'')}${field('المهارات المطلوبة — افصل بفاصلة','skills',t?.skills.join('، ')||'',{max:300})}<div class="form-row">${field('عدد أعضاء الفريق شامل صاحب الفريق','capacity',t?.capacity||4,{type:'number',max:3})}${selectField('حالة المشروع','status',['مفتوح','مكتمل','مغلق'],t?.status)}</div>${!t?teamContactFields():''}<p class="form-note">فريقك متاح للأعضاء. طلبات الانضمام تظهر لصاحب الفريق وصاحب الطلب فقط.</p>${formEnd(t?'حفظ الفريق':'نشر الفريق')}`,async(data,form)=>{
     if(!validateText(form,data,['title','description','skills'])) return;
     const capacity=Number(data.get('capacity')), skills=skillsOf(data.get('skills'));
     if(!Number.isInteger(capacity)||capacity<2||capacity>30||capacity<(t?.members.length||1)) { form.querySelector('.error').textContent='عدد الأعضاء من 2 إلى 30، ولا يقل عن الأعضاء الحاليين.'; return; }
     if(!skills.length) { form.querySelector('.error').textContent='حدد مهارة مطلوبة واحدة على الأقل.'; return; }
     const next={id:t?.id||uid(),owner:me().id,title:data.get('title').trim(),description:data.get('description').trim(),category:data.get('category'),skills,capacity,status:data.get('status'),members:t?.members||[me().id]};
+    if(!t)Object.assign(next,teamContactPayload(data));
     await cloudCommand('save_team',next);closeDialog();toast('اتحفظ الفريق وبقى ظاهر للأعضاء.');
   });
   const cap=$('modal-body').querySelector('[name="capacity"]'); if(cap){cap.min=2;cap.max=30;cap.step=1;}
@@ -780,21 +781,21 @@ function renderTeams() {
     const own=p?.id===t.owner,member=t.members.includes(p?.id),request=state.requests.find(r=>r.team===t.id&&r.user===p?.id),full=t.members.length>=t.capacity;
     let action=own?button('manage-team','إدارة الطلبات',t.id,'primary'):member?'<span class="badge">أنت عضو في الفريق</span>':request?`<span class="badge pending">${request.status==='pending'?'طلبك قيد المراجعة':request.status==='rejected'?'لم يتم قبول الطلب':'تم قبولك'}</span>`:t.status!=='مفتوح'||full?'<span class="muted">الانضمام غير متاح</span>':button('apply','اطلب الانضمام',t.id,'primary');
     if(request?.status==='pending'&&!own) action+=button('cancel-request','سحب الطلب',request.id);
-    return `<article class="card"><div class="card-header"><span class="pill">${esc(t.category)}</span><span class="badge ${t.status!=='مفتوح'?'pending':''}">${esc(full&&t.status==='مفتوح'?'ممتلئ':t.status)}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.description)}</p><div class="meta">بواسطة ${esc(nameOf(t.owner))} · ${t.members.length} / ${t.capacity} أعضاء</div><div class="skill-row">${tags(t.skills)}</div><div class="card-bottom">${action}${own?button('edit-team','تعديل',t.id):''}</div></article>`;
+    return `<article class="card"><div class="card-header"><span class="pill">${esc(t.category)}</span><span class="badge ${t.status!=='مفتوح'?'pending':''}">${esc(full&&t.status==='مفتوح'?'ممتلئ':t.status)}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.description)}</p><div class="meta">بواسطة ${esc(nameOf(t.owner))} · ${t.members.length} / ${t.capacity} أعضاء</div><div class="skill-row">${tags(t.skills)}</div><div class="card-bottom">${action}${member?button('team-contacts','أعضاء الفريق والتواصل',t.id):''}${own?button('edit-team','تعديل',t.id):''}</div></article>`;
   }).join(''):empty('لسه مفيش فريق هنا',state.teams.length?'جرّب تغيير البحث أو الفلتر.':'ابدأ بفكرتك، وحدد المهارات اللي محتاجها.',button('new-team','+ أنشئ أول فريق'));
 }
 function applyDialog(id) {
   if(!requireProfile())return;
   const t=state.teams.find(x=>x.id===id); if(!t||t.owner===me().id||t.status!=='مفتوح'||t.members.length>=t.capacity||state.requests.some(r=>r.team===id&&r.user===me().id))return;
-  openDialog('طلب انضمام للفريق',`<p class="form-note">${esc(t.title)} · الطلب محفوظ على الخادم، ويظهر لصاحب الفريق في إدارة الطلبات.</p><form>${textarea('عرف الفريق بنفسك وإزاي تقدر تساعد','message','',700)}${formEnd('إرسال طلب الانضمام')}`,async(data,form)=>{
+  openDialog('طلب انضمام للفريق',`<p class="form-note">${esc(t.title)} · الطلب محفوظ على الخادم، ويظهر لصاحب الفريق في إدارة الطلبات.</p><form>${textarea('عرف الفريق بنفسك وإزاي تقدر تساعد','message','',700)}${teamContactFields()}${formEnd('إرسال طلب الانضمام')}`,async(data,form)=>{
     if(!validateText(form,data,['message']))return;
-    await cloudCommand('apply',{team:id,message:data.get('message').trim()});closeDialog();toast('اترسل طلبك لصاحب الفريق.');
+    await cloudCommand('apply',{team:id,message:data.get('message').trim(),...teamContactPayload(data)});closeDialog();toast('اترسل طلبك لصاحب الفريق.');
   });
 }
 function manageTeam(id) {
   const t=state.teams.find(x=>x.id===id); if(!t||t.owner!==me()?.id)return;
   const requests=state.requests.filter(r=>r.team===id);
-  openDialog('إدارة الفريق',`<p class="form-note">${esc(t.title)} · ${t.members.length} من ${t.capacity} أعضاء<br>الأعضاء: ${t.members.map(x=>esc(nameOf(x))).join('، ')}</p><h3>طلبات الانضمام</h3>${requests.length?requests.map(r=>`<div class="management-row"><strong>${esc(nameOf(r.user))}</strong><p>${esc(r.message)}</p><div class="actions">${r.status==='pending'?button('accept-request','قبول',r.id,'primary')+button('reject-request','رفض',r.id,'secondary'):`<span class="badge">${r.status==='accepted'?'مقبول':'مرفوض'}</span>`}</div></div>`).join(''):'<p class="muted">مفيش طلبات لسه.</p>'}<div class="form-actions">${button('edit-team','تعديل الفريق',id,'secondary')}${button('delete-team','حذف الفريق',id,'danger')}</div>`);
+  openDialog('إدارة الفريق',`<p class="form-note">${esc(t.title)} · ${t.members.length} من ${t.capacity} أعضاء<br>الأعضاء: ${t.members.map(x=>esc(nameOf(x))).join('، ')}</p>${button('team-contacts','أعضاء الفريق والتواصل',id,'secondary')}<h3>طلبات الانضمام</h3>${requests.length?requests.map(r=>`<div class="management-row"><strong>${esc(nameOf(r.user))}</strong><p>${esc(r.message)}</p><div class="actions">${r.status==='pending'?button('accept-request','قبول',r.id,'primary')+button('reject-request','رفض',r.id,'secondary'):`<span class="badge">${r.status==='accepted'?'مقبول':'مرفوض'}</span>`}</div></div>`).join(''):'<p class="muted">مفيش طلبات لسه.</p>'}<div class="form-actions">${button('edit-team','تعديل الفريق',id,'secondary')}${button('delete-team','حذف الفريق',id,'danger')}</div>`);
 }
 async function decideRequest(id,accept) {
   const r=state.requests.find(x=>x.id===id),t=state.teams.find(x=>x.id===r?.team);
@@ -1025,7 +1026,7 @@ function authDialog(mode='login'){
   else if(authStarting)content+='<p class="form-note">جاري التحقق من جلستك…</p>';
   if(mode==='login'||mode==='signup')content+=`<div class="auth-tabs">${button('auth-login','تسجيل الدخول','',''+(mode==='login'?'primary':'secondary'))}${button('auth-signup','حساب جديد','',''+(mode==='signup'?'primary':'secondary'))}</div>`;
   content+='<form data-auth-form="'+mode+'">';
-  if(mode==='signup')content+='<label>كود الطالب<input name="studentCode" dir="ltr" required minlength="3" maxlength="40" autocomplete="off" placeholder="مثال: 00123456"></label><p class="muted">اكتب الكود الموجود في كارنيهك أو نظام المعهد. الكود خاص بيك وبإدارة الموقع، ومش بيظهر في دليل الطلبة.</p>'+authInput('اسمك','name','text','name')+field('الكلية أو المعهد','college','',{max:80})+selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],'الأولى');
+  if(mode==='signup')content+='<label>كود الطالب (إجباري)<input name="studentCode" dir="ltr" required minlength="3" maxlength="40" pattern="(?:[A-Za-z0-9_٠-٩۰-۹]|-){3,40}" autocomplete="off" placeholder="مثال: 00123456"></label><p class="muted">اكتب الكود الموجود في كارنيهك أو نظام المعهد. الكود خاص بيك وبإدارة الموقع، ومش بيظهر في دليل الطلبة.</p>'+authInput('اسمك','name','text','name')+field('الكلية أو المعهد','college','',{max:80})+selectField('الفرقة','year',['الأولى','الثانية','الثالثة','الرابعة','الخامسة'],'الأولى');
   content+=authInput('البريد الإلكتروني','email','email','email');
   if(mode==='login'||mode==='signup')content+=authInput('كلمة المرور','password','password',mode==='login'?'current-password':'new-password',mode==='signup'?12:0);
   if(mode==='signup')content+=authInput('تأكيد كلمة المرور','confirm','password','new-password',12)+'<p class="muted">12 حرفًا على الأقل. هنبعت لك رسالة لتأكيد بريدك قبل الدخول.</p><p class="form-note">الاسم والبريد والكلية والفرقة متاحين لإدارة UniHub لإدارة حسابك. ظهور ملفك للطلبة اختياري من إعدادات الملف. كلمة مرورك لا تظهر للإدارة.</p>'+(eventSheetsEnabled()?'<label class="check"><input type="checkbox" name="managementSheetConsent" required> أوافق على حفظ اسمي وكود الطالب وبريدي وكليتي وفرقتي وتاريخ حسابي وآخر دخول في Google Sheet خاص بإدارة UniHub لمتابعة الطلبة.</label>':'');
@@ -1206,6 +1207,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script>// Shared activity comes from authenticated RPCs, never from browser snapshots.
 let sharedReady=false, sharedBusy=false, sharedReadSeq=0, sharedTimer=null, sharedLastError='';
 function sharedError(error){
+  if(typeof TEAM_CONTACT_ERRORS!=='undefined'&&TEAM_CONTACT_ERRORS[error?.message])return TEAM_CONTACT_ERRORS[error.message];
   const messages={event_closed:'التسجيل للحدث ده مقفول حاليًا.',consent_required:'وافق على مشاركة بيانات التسجيل مع منظم الفعالية أولًا.',integration_not_ready:'ربط تسجيلات الفعاليات لم يكتمل بعد. حاول لاحقًا.',forbidden:'مش مسموح لك تعدّل بيانات حساب تاني.',unauthorized:'الجلسة غير متاحة. سجّل الدخول من جديد.',team_full:'الفريق مغلق أو عدد أعضائه اكتمل.',capacity_below_members:'العدد المطلوب أقل من أعضاء الفريق الحاليين.',event_full:'اكتمل عدد تسجيلات هذه الفعالية.',request_already_decided:'الطلب اتراجع بالفعل. حدّث القائمة.',invalid_input:'راجع البيانات المدخلة.',import_too_large:'استيراد أكثر من 200 عنصر يحتاج تقسيم البيانات.',shared_unavailable:'تعذر الوصول للمحتوى المشترك. جرّب تحديث البيانات.',stale_session:'الجلسة اتغيرت. سجّل الدخول من جديد.'};
   if(messages[error?.message])return messages[error.message];
   if(error?.code==='23505')return 'الطلب أو التسجيل ده موجود بالفعل.';
@@ -1237,7 +1239,7 @@ async function sharedRefresh(force=false){
 async function cloudCommand(action,payload){
   if(!authUser||!authReady)throw Error('unauthorized');
   const userId=authUser.id;
-  const {data,error}=await authClient.rpc(action==='book'&&eventSheetsEnabled()?'unihub_book_event':'unihub_mutate',action==='book'&&eventSheetsEnabled()?{payload}:{action_name:action,payload});
+  const {data,error}=await authClient.rpc(['save_team','apply'].includes(action)?'unihub_team_action':action==='book'&&eventSheetsEnabled()?'unihub_book_event':'unihub_mutate',action==='book'&&eventSheetsEnabled()?{payload}:{action_name:action,payload});
   if(error){const failure=Error(sharedError(error));failure.sharedMessage=true;throw failure;}
   if(authUser?.id!==userId)throw Error('stale_session');
   // An acknowledged write must not be reported as lost if the follow-up read fails.
@@ -1637,6 +1639,91 @@ window.scrollToSec=function(id){if(location.hash==='#registrations'){location.ha
 const registrationsFooter=document.querySelector('footer');if(registrationsFooter)registrationsFooter.before($('my-registrations-page'));
 window.addEventListener('hashchange',registrationsRoute);window.addEventListener('popstate',registrationsRoute);registrationsRoute();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(location.hash==='#registrations')loadMyRegistrations();else if(location.hash==='#admin'&&siteAdminTab==='overview')loadOverview();}});
+</script>
+<!-- UNIHUB_TEAM_CONTACTS -->
+<style>
+.team-contact-list{display:grid;gap:14px;margin:20px 0}.team-contact-card{border:1px solid #ffffff18;background:#ffffff04;border-radius:16px;padding:18px}.team-contact-card h3{margin:0 0 12px}.team-contact-card dl{display:grid;grid-template-columns:auto 1fr;gap:10px 18px;margin:12px 0}.team-contact-card dt{color:#a9b7ca}.team-contact-card dd{margin:0;overflow-wrap:anywhere}.team-contact-card a{color:#76e4c4}.team-contact-self{border-color:#67e8c34d}.team-contact-notice{padding:14px;border-radius:14px;background:#67e8c30b;color:#b6c3d5;line-height:1.9;font-size:13px}.team-contact-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.team-contact-consent{margin:16px 0}
+</style>
+<script>
+const TEAM_CONTACT_ERRORS={team_phone_invalid:'اكتب رقم موبايل صحيح من ٧ إلى ١٥ رقمًا، وممكن يبدأ بعلامة + وكود الدولة.',team_code_required:'ضيف كود الطالب من «كود الطالب» في حسابك الأول، وبعدها ارجع للفريق.',team_consent_required:'لازم توافق على مشاركة كودك ورقمك مع أعضاء الفريق المقبولين.'};
+let teamContactSeq=0,teamContactView=null,teamContactSaving=false;
+function teamContactFields(phone='',adminConsent=false){
+ return `<div class="team-contact-consent">${field('رقم موبايل للتواصل مع أعضاء الفريق','teamPhone',phone,{type:'tel',max:24})}<p class="muted">كود الطالب هيتاخد من حسابك تلقائيًا. رقمك وكودك هيظهروا لأعضاء الفريق المقبولين. مشاركة البيانات مع الإدارة وشيت الإدارة اختيار منفصل تحت، والطلب المعلّق مش بيعرضهم.</p><label class="check"><input type="checkbox" name="teamContactConsent" required> أوافق إن أعضاء الفريق المقبولين يشوفوا اسمي وكود الطالب ورقم موبايلي للتواصل بخصوص المشروع</label><label class="check"><input type="checkbox" name="teamAdminConsent" ${adminConsent?'checked':''}> أوافق على مشاركة عضويتي في الفريق واسمي وكود الطالب وبريدي وكليتي وفرقتي ورقم تواصلي مع إدارة UniHub وحفظها في Google Sheet خاص بالإدارة. اختياري، وأقدر أوقفه بتعديل بياناتي.</label><button class="text-button" type="button" data-action="my-student-code">عرض أو إضافة كود الطالب</button></div>`;
+}
+function teamContactPayload(data){return {teamPhone:String(data.get('teamPhone')||'').trim(),teamContactConsent:data.has('teamContactConsent'),teamAdminConsent:data.has('teamAdminConsent')};}
+function teamContactError(error){return TEAM_CONTACT_ERRORS[error?.message]||sharedError(error);}
+function teamContactIsMember(id){return !!authUser&&state.teams.some(t=>t.id===id&&t.members.includes(authUser.id));}
+async function teamContactsDialog(id){
+ if(!requireProfile()||!teamContactIsMember(id))return;
+ const user=authUser.id,seq=++teamContactSeq;teamContactView=null;
+ openDialog('أعضاء الفريق والتواصل','<div data-team-contact-view="'+esc(id)+'" role="status">جاري تحميل الأعضاء…</div>');
+ try{const {data,error}=await authClient.rpc('unihub_team_contacts',{team_key:id});if(error)throw error;
+ if(seq!==teamContactSeq||authUser?.id!==user||!$('modal').open||!$('modal-body').querySelector('[data-team-contact-view]')||!teamContactIsMember(id))return;
+ teamContactView=data;
+ const self=data.members.find(m=>m.id===user);
+ $('modal-body').innerHTML=`<div data-team-contact-view="${esc(id)}"><p class="form-note">${esc(data.title)} · ${data.members.length} أعضاء</p><p class="team-contact-notice">البيانات دي لأعضاء فريقك المقبولين بس، علشان تتواصلوا بخصوص المشروع. حافظ على خصوصية زمايلك ومتشاركش أرقامهم أو أكوادهم خارج الفريق.</p><div class="team-contact-list">${data.members.map(m=>`<article class="team-contact-card ${m.id===user?'team-contact-self':''}"><h3>${esc(m.name)} ${m.owner?'<span class="badge">صاحب الفريق</span>':''} ${m.id===user?'<span class="badge">أنت</span>':''}</h3>${m.shared?`<dl><dt>كود الطالب</dt><dd><bdi>${esc(m.studentCode||'غير مضاف')}</bdi></dd><dt>رقم الموبايل</dt><dd><a dir="ltr" href="tel:${esc(m.phone)}">${esc(m.phone)}</a></dd></dl><a class="secondary" href="tel:${esc(m.phone)}"><i class="fa-solid fa-phone" aria-hidden="true"></i> اتصال</a>`:'<p class="muted">لسه مفعّلش مشاركة رقم الموبايل وكود الطالب مع الفريق.</p>'}</article>`).join('')}</div><div class="team-contact-actions">${button('team-contact-edit',self?.shared?'تعديل رقم التواصل':'إضافة بياناتي للفريق',id,'primary')}${self?.shared?button('team-contact-stop','إيقاف مشاركة بياناتي',id,'secondary'):''}${button('team-contacts','تحديث الأعضاء',id,'secondary')}</div></div>`;
+ }catch(error){if(seq===teamContactSeq&&authUser?.id===user&&$('modal').open&&$('modal-body').querySelector('[data-team-contact-view]'))$('modal-body').innerHTML='<div data-team-contact-view="'+esc(id)+'"><p class="error" role="alert">'+esc(teamContactError(error))+'</p>'+button('team-contacts','حاول تاني',id,'primary')+'</div>';}
+}
+function editTeamContact(id){
+ if(!teamContactIsMember(id)||teamContactView?.teamId!==id||teamContactSaving)return;
+ const user=authUser.id,self=teamContactView.members.find(m=>m.id===user);
+ openDialog('بياناتي داخل الفريق','<p class="form-note">المشاركة تخص الفريق ده فقط. الكود من بيانات حسابك، وتقدر توقف المشاركة في أي وقت.</p><form>'+teamContactFields(self?.phone||'',self?.adminConsent===true)+formEnd('حفظ ومشاركة بياناتي'),async(data,form)=>{
+ if(teamContactSaving||authUser?.id!==user)return;teamContactSaving=true;
+ const fieldset=form.querySelector('button[type="submit"]');if(fieldset)fieldset.disabled=true;
+ try{const payload=teamContactPayload(data);const {error}=await authClient.rpc('unihub_set_team_admin_contact',{team_key:id,phone_value:payload.teamPhone,share_contact:payload.teamContactConsent,admin_consent:payload.teamAdminConsent});
+ if(authUser?.id!==user)return;if(error)throw error;toast('اتحفظت بيانات التواصل للفريق.');await teamContactsDialog(id);
+ }catch(error){if(authUser?.id===user&&form.isConnected)form.querySelector('.error').textContent=teamContactError(error);}finally{teamContactSaving=false;if(fieldset)fieldset.disabled=false;}
+ });
+}
+function stopTeamContact(id){
+ if(!teamContactIsMember(id)||teamContactView?.teamId!==id||teamContactSaving)return;const user=authUser.id;
+ confirmDialog('إيقاف مشاركة بياناتي','رقمك وكودك مش هيظهروا للفريق بعد الإيقاف. هتفضل عضو واسمك هيفضل في قائمة الأعضاء.',async()=>{
+ if(teamContactSaving||authUser?.id!==user)return;teamContactSaving=true;
+ try{const {error}=await authClient.rpc('unihub_set_team_contact',{team_key:id,phone_value:'',share_contact:false});if(authUser?.id!==user)return;if(error)throw error;toast('اتوقفت مشاركة رقمك وكودك في الفريق.');await teamContactsDialog(id);}finally{teamContactSaving=false;}
+ });
+}
+Object.assign(actions,{'team-contacts':teamContactsDialog,'team-contact-edit':editTeamContact,'team-contact-stop':stopTeamContact});
+const teamContactResetAdmin=resetAdmin;
+resetAdmin=function(){teamContactResetAdmin();teamContactSeq++;teamContactView=null;teamContactSaving=false;if($('modal-body').querySelector('[data-team-contact-view],.team-contact-consent')){closeDialog();$('modal-body').replaceChildren();}};
+const teamContactCloseDialog=closeDialog;
+closeDialog=function(){teamContactSeq++;teamContactView=null;return teamContactCloseDialog();};
+actions.close=closeDialog;
+const teamContactRender=render;
+render=function(){teamContactRender();const id=$('modal-body')?.querySelector('[data-team-contact-view]')?.getAttribute('data-team-contact-view');if(id&&!teamContactIsMember(id)){teamContactSeq++;teamContactView=null;closeDialog();$('modal-body').replaceChildren();}};
+</script>
+
+<!-- UNIHUB_ADMIN_TEAM_ROSTER -->
+<style>.roster-table-wrap{overflow:auto;border:1px solid #ffffff18;border-radius:16px;margin:18px 0}.roster-table-wrap table{width:100%;min-width:1500px;border-collapse:collapse;text-align:right;font-size:13px}.roster-table-wrap th,.roster-table-wrap td{padding:15px 18px;border-bottom:1px solid #ffffff12;white-space:nowrap}.roster-table-wrap th{background:#192238;color:#acbad0}.roster-table-wrap tbody tr:hover{background:#ffffff05}.roster-search{display:flex;align-items:flex-end;gap:12px;margin:22px 0;flex-wrap:wrap}.roster-search label{flex:1;min-width:240px}.roster-search button{white-space:nowrap}.roster-search input{width:100%}@media(max-width:600px){.roster-search label{flex-basis:100%;min-width:0}.roster-search button{flex:1}}</style>
+<script>
+let rosterSeq=0,rosterPage=1,rosterSearch='',rosterTotal=0,rosterExporting=false;
+const rosterAdminRender=renderSiteAdmin;
+renderSiteAdmin=function(){rosterAdminRender();if(!adminAllowed||!siteAdminData||location.hash!=='#admin')return;
+ const nav=document.querySelector('.site-admin-tabs'),entry=document.createElement('button');entry.dataset.action='site-tab-members';entry.setAttribute('aria-pressed',String(siteAdminTab==='members'));entry.textContent='أعضاء الفرق';nav.append(entry);if(siteAdminTab==='members')loadTeamRoster(rosterPage);
+};
+async function loadTeamRoster(page=1){
+ if(!adminAllowed||!authUser||location.hash!=='#admin'||siteAdminTab!=='members')return;
+ const user=authUser.id,seq=++rosterSeq,term=rosterSearch,host=$('site-admin-panel');host.innerHTML='<div class="site-admin-empty" role="status">جاري تحميل أعضاء الفرق…</div>';
+ try{const {data,error}=await authClient.rpc('unihub_admin_team_members',{search_text:term,page_number:page});if(error)throw error;
+ if(seq!==rosterSeq||authUser?.id!==user||!adminAllowed||siteAdminTab!=='members'||location.hash!=='#admin')return;
+ rosterPage=data.page;rosterTotal=data.total;
+ host.innerHTML=`<div class="site-panel-heading"><div><span class="site-kicker">كل الفرق وأعضائها</span><h2>أعضاء الفرق</h2><p>${reportNumber(data.total)} عضوية في نتيجة البحث. الطالب المشارك في فريقين يظهر مرة لكل فريق.</p></div><button class="secondary" data-action="roster-refresh">تحديث</button></div><form id="roster-search-form" class="roster-search"><label>بحث بالاسم أو الكود أو البريد أو اسم الفريق<input name="search" maxlength="80" value="${esc(term)}" placeholder="مثال: 00123 أو فريق التخرج"></label><button class="primary" type="submit">بحث</button><button class="secondary" type="button" data-action="roster-clear">مسح البحث</button></form><div class="team-contact-actions"><button class="secondary" data-action="roster-export">تنزيل نتيجة البحث CSV / Excel</button><a class="secondary" href="https://docs.google.com/spreadsheets/d/1wXeKTSN8UMkU3CNDuOwk-VcAmYEHFp9PDz2r9u-lieY/edit" target="_blank" rel="noopener noreferrer">فتح Google Sheets ↗</a></div><p class="insight-note">شيت «أعضاء الفرق» بيتحدث تلقائيًا للعضويات اللي وافق أصحابها على التصدير. رقم التواصل بيظهر للإدارة بعد نفس الموافقة فقط. العضوية هنا تعني قبول الطالب في الفريق، ولا تشمل الطلبات المعلّقة أو المرفوضة. وقت التحديث: ${esc(siteDate(new Date().toISOString()))}</p><p id="roster-export-status" role="status" class="muted"></p><p class="insight-note">اسحب الجدول يمين وشمال لعرض باقي التفاصيل.</p><div class="roster-table-wrap" tabindex="0" role="region" aria-label="بيانات أعضاء الفرق"><table><thead><tr>${['الفريق','الاسم','كود الطالب','البريد','الكلية','الفرقة','الدور','رقم التواصل','الحساب','تاريخ إنشاء الحساب','تصدير الشيت'].map(x=>'<th>'+x+'</th>').join('')}</tr></thead><tbody>${data.rows.map(r=>`<tr><td>${esc(r.team)}</td><td>${esc(r.name)}</td><td><bdi>${esc(r.studentCode||'غير مضاف')}</bdi></td><td><bdi>${esc(r.email)}</bdi></td><td>${esc(r.college||'غير مضاف')}</td><td>${esc(r.year)}</td><td>${esc(r.role)}</td><td>${r.phone?`<a href="tel:${esc(r.phone)}"><bdi>${esc(r.phone)}</bdi></a>`:'لم يوافق على المشاركة مع الإدارة'}</td><td>${r.confirmed?'البريد مؤكد':'البريد غير مؤكد'}</td><td>${esc(siteDate(r.registeredAt))}</td><td>${r.sheetShared?'وافق على التصدير':'بدون موافقة تصدير'}</td></tr>`).join('')}</tbody></table></div>${!data.rows.length?'<div class="empty">مفيش أعضاء مطابقين للبحث.</div>':''}${sitePager(data.page,data.total,50,'roster-prev','roster-next')}<p class="insight-note">ملف CSV نسخة محلية للمسؤول تشمل كل نتيجة البحث، مش الصفحة الحالية بس. موافقة Google Sheet تخص النقل التلقائي وإظهار رقم التواصل. الملف بيتفتح في Excel أو Google Sheets. بيانات الحساب هنا للإدارة؛ كلمات المرور ورموز الدخول لا تُعرض أو تُصدّر.</p>`;
+ $('roster-search-form').addEventListener('submit',e=>{e.preventDefault();rosterSearch=String(new FormData(e.currentTarget).get('search')||'').trim();loadTeamRoster(1);});
+ }catch(error){if(seq===rosterSeq&&authUser?.id===user&&adminAllowed&&siteAdminTab==='members'&&location.hash==='#admin')host.innerHTML='<div class="site-admin-empty"><h2>تعذر تحميل أعضاء الفرق</h2><p>'+esc(reportFailure(error))+'</p>'+button('roster-refresh','حاول تاني','','primary')+'</div>';}
+}
+function rosterCsvCell(value,forceText=false){let text=String(value??'');if(text&&(forceText||/^[\s]*[=+@-]/.test(text)))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
+async function exportTeamRoster(){
+ if(rosterExporting||!authUser||!adminAllowed||siteAdminTab!=='members'||location.hash!=='#admin')return;
+ rosterExporting=true;const user=authUser.id,term=rosterSearch,status=$('roster-export-status');if(status)status.textContent='جاري تجهيز كل نتيجة البحث…';
+ try{const rows=[];let page=1;while(true){const {data,error}=await authClient.rpc('unihub_admin_team_members',{search_text:term,page_number:page});if(error)throw error;
+ if(authUser?.id!==user||!adminAllowed||siteAdminTab!=='members'||location.hash!=='#admin')return;
+ rows.push(...data.rows);if(data.page*50>=data.total||!data.rows.length)break;page=data.page+1;if(page>2000)throw Error('export_too_large');}
+ const header=['الفريق','الاسم','كود الطالب','البريد','الكلية','الفرقة','الدور','رقم التواصل','تاريخ الحساب','تأكيد البريد','موافقة الشيت'];
+ const csv='\ufeff'+[header.map(v=>rosterCsvCell(v)).join(','),...rows.map(r=>[r.team,r.name,r.studentCode,r.email,r.college,r.year,r.role,r.phone,r.registeredAt,r.confirmed?'مؤكد':'غير مؤكد',r.sheetShared?'نعم':'لا'].map((v,i)=>rosterCsvCell(v,i===2||i===7)).join(','))].join('\r\n');
+ const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download='UniHub-team-members-'+new Date().toISOString().slice(0,10)+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);if(status?.isConnected)status.textContent='بدأ تنزيل '+reportNumber(rows.length)+' عضوية. الملف يحتوي على بيانات خاصة؛ احتفظ به للإدارة فقط.';
+ }catch(error){if(authUser?.id===user&&status?.isConnected)status.textContent='تعذر تجهيز الملف. حاول تاني؛ مفيش ملف ناقص اتنزّل.';}finally{rosterExporting=false;}
+}
+Object.assign(actions,{'site-tab-members':()=>{if(siteSaving)return;siteAdminTab='members';renderSiteAdmin();},'roster-refresh':()=>loadTeamRoster(rosterPage),'roster-prev':()=>loadTeamRoster(rosterPage-1),'roster-next':()=>loadTeamRoster(rosterPage+1),'roster-clear':()=>{rosterSearch='';loadTeamRoster(1);},'roster-export':exportTeamRoster});
+const rosterResetAdmin=resetAdmin;resetAdmin=function(){rosterSeq++;rosterSearch='';rosterPage=1;rosterTotal=0;rosterResetAdmin();};
 </script>
 </body>
 </html>
